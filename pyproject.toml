@@ -13,8 +13,7 @@ dependencies = [
     "plotly>=5.17.0",
     "supabase>=2.30.0",
     "dotenv>=0.9.9",
-    "pytest>=9.1.1",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
+[dependency-groups]
+dev = ["pytest>=9.1.1"]
