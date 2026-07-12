@@ -9,6 +9,9 @@ backup/
 # Data
 data/
 
+# scripts
+explore.ipynb
+
 # Virtual environment
 .venv/
 venv/
