@@ -24,13 +24,5 @@ def get_supabase_client(
 
     client = create_client(supabase_url, supabase_key)
     if access_token:
-        client.auth.set_session(
-            {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-            }
-        )
+        client.auth.set_session(access_token, refresh_token)
     return client
-
-
-

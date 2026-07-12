@@ -198,20 +198,19 @@ def _normalize_response(response):
     return user, access_token, refresh_token, error
 
 
-def create_user_profile(user_id: str, email: str, role: str = "free", access_token: str | None = None) -> tuple[dict | None, str | None]:
+def create_user_profile(user_id: str, email: str, role: str = "free", access_token: str | None = None, refresh_token: str | None = None) -> tuple[dict | None, str | None]:
     """Create a simple profile row for a new user.
 
     Uses the anon client with the user's JWT; the RLS policy
     ``authenticated_insert_own_profile`` allows inserting own profile.
     """
     try:
-        supabase = get_supabase_client()
-        if access_token:
-            supabase.postgrest.auth(token=access_token)
+        supabase = get_supabase_client(access_token=access_token, refresh_token=refresh_token)
         response = supabase.schema("main").table("profiles").insert(
             {
-                "user_id": user_id, 
-                "role": role
+                "user_id": user_id,
+                "email": email,
+                "role": role,
             }
         ).execute()
     except Exception as exc:
@@ -224,16 +223,13 @@ def create_user_profile(user_id: str, email: str, role: str = "free", access_tok
     return getattr(response, "data", None), None
 
 
-def fetch_user_profile(user_id: str, access_token: str | None = None) -> dict | None:
+def fetch_user_profile(user_id: str, access_token: str | None = None, refresh_token: str | None = None) -> dict | None:
     """Fetch the user's role from the profiles table.
 
-    Attaches the user's access_token so RLS sees an authenticated user
-    (same approach as data_loader.py).
+    Attaches the user's access_token so RLS sees an authenticated user.
     """
     try:
-        supabase = get_supabase_client()
-        if access_token:
-            supabase.postgrest.auth(token=access_token)
+        supabase = get_supabase_client(access_token=access_token, refresh_token=refresh_token)
         response = supabase.schema("main").table("profiles").select("role").eq("user_id", user_id).single().execute()
         data = getattr(response, "data", None)
         return data if isinstance(data, dict) else None
@@ -242,11 +238,11 @@ def fetch_user_profile(user_id: str, access_token: str | None = None) -> dict | 
         return None
 
 
-def _resolve_user_role(user: dict, access_token: str | None = None) -> str:
+def _resolve_user_role(user: dict, access_token: str | None = None, refresh_token: str | None = None) -> str:
     """Determine the user's role, checking profiles table, defaulting to 'free'."""
     user_id = user.get("id")
     if user_id:
-        profile = fetch_user_profile(user_id, access_token=access_token)
+        profile = fetch_user_profile(user_id, access_token=access_token, refresh_token=refresh_token)
         if profile and profile.get("role"):
             return profile["role"]
     return "free"
@@ -285,7 +281,7 @@ def sign_up_with_email_password(email: str, password: str) -> tuple[dict | None,
 
     user_id = user.get("id")
     if user_id:
-        profile_data, profile_error = create_user_profile(user_id, email, role="free", access_token=access_token)
+        profile_data, profile_error = create_user_profile(user_id, email, role="free", access_token=access_token, refresh_token=refresh_token)
         if profile_error:
             logger.error("Profile creation failed for user %s: %s", user_id, profile_error)
             return None, f"Signup succeeded but profile creation failed: {profile_error}"
@@ -296,7 +292,7 @@ def sign_up_with_email_password(email: str, password: str) -> tuple[dict | None,
         "user": user,
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "role": _resolve_user_role(user, access_token=access_token),
+        "role": _resolve_user_role(user, access_token=access_token, refresh_token=refresh_token),
         "email_confirmed": confirmed,
     }, None
 
@@ -322,7 +318,7 @@ def login_with_email_password(email: str, password: str) -> tuple[dict | None, s
         return None, "Login failed: User Not Registered."
 
     confirmed = _is_email_confirmed(user)
-    role = _resolve_user_role(user, access_token=access_token)
+    role = _resolve_user_role(user, access_token=access_token, refresh_token=refresh_token)
 
     logger.info("User logged in: %s (role=%s, confirmed=%s)", email, role, confirmed)
 
@@ -498,7 +494,7 @@ def _detect_and_handle_recovery() -> bool:
             logger.warning("Recovery: no user found for provided tokens")
             return False
 
-        role = _resolve_user_role(user, access_token=access_token)
+        role = _resolve_user_role(user, access_token=access_token, refresh_token=refresh_token)
 
         st.session_state.auth_user = user
         st.session_state.auth_access_token = access_token
@@ -682,7 +678,7 @@ def render_auth_sidebar() -> None:
             st.write("Create a free account. Subscribe anytime to unlock the full picture.")
             register_email = st.text_input("Email", key="register_email")
             register_password = st.text_input("Password", type="password", key="register_password")
-            register_submit = st.form_submit_button("Register")
+            register_submit = st.form_submit_button("Register", disabled=True)
 
             if register_submit:
                 if not register_email or not register_password:
