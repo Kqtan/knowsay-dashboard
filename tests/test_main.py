@@ -10,6 +10,7 @@ from main import (
     get_role_label,
     parse_month_year,
     _fake_price_distribution,
+    calculate_mortgage_schedule,
     filter_data,
     render_gated_chart,
 )
@@ -125,6 +126,41 @@ class TestRenderGatedChart:
         render_gated_chart("free", real_fig, "X", fake_fig_fn=lambda: fig2)
         # The HTML rendering should produce output — just verify it ran
         assert mock_md.called
+
+
+# ---------------------------------------------------------------------------
+# calculate_mortgage_schedule
+# ---------------------------------------------------------------------------
+
+class TestCalculateMortgageSchedule:
+    def test_default_values(self):
+        schedule, metrics = calculate_mortgage_schedule(
+            property_price=600_000,
+            downpayment_amount=60_000,
+            additional_financing=20_000,
+            mortgage_years=35,
+            annual_interest_rate=3.75,
+        )
+
+        assert len(schedule) == 420
+        assert metrics["loan_amount"] == 560_000
+        assert round(metrics["monthly_payment"], 2) == 2396.27
+        assert round(metrics["total_interest"], 2) == 446432.58
+        assert round(schedule.iloc[-1]["Remaining Balance (RM)"], 2) == 0
+
+    def test_zero_interest_uses_straight_line_payment(self):
+        schedule, metrics = calculate_mortgage_schedule(
+            property_price=120_000,
+            downpayment_amount=20_000,
+            additional_financing=0,
+            mortgage_years=10,
+            annual_interest_rate=0,
+        )
+
+        assert len(schedule) == 120
+        assert round(metrics["monthly_payment"], 2) == 833.33
+        assert round(metrics["total_interest"], 2) == 0
+        assert round(schedule["Principal (RM)"].sum(), 2) == 100_000
 
 
 # ---------------------------------------------------------------------------

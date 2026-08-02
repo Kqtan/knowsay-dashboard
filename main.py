@@ -21,6 +21,13 @@ from utils.data_gov_my import (
     render_state_demographics,
     render_kl_vital_stats,
 )
+from utils.mortgage import (
+    calculate_mortgage_schedule,
+    format_rm_input,
+    parse_rm_input,
+    render_metric_card,
+    render_mortgage_calculator,
+)
 
 
 def get_role_label(role: str) -> str:
@@ -167,6 +174,8 @@ def filter_data(df, property_types, districts, mukims, land_area_range, date_ran
         filtered_df = filtered_df.drop('_txn_date', axis=1)
     
     return filtered_df
+
+
 
 def main():
     st.set_page_config(page_title="KnowSay", layout="wide")
@@ -376,7 +385,12 @@ def main():
     st.markdown("---")
 
     # Create tabbed interface for different visualizations
-    tab_charts, tab_map, tab_socio = st.tabs(["📊 Charts", "🗺️ Mukim Map", "🌐 Socioeconomic Insights"])
+    tab_charts, tab_map, tab_socio, tab_mortgage = st.tabs([
+        "📊 Charts",
+        "🗺️ Mukim Map",
+        "🌐 Socioeconomic Insights",
+        "🧮 Mortgage Calculator",
+    ])
     
     
     with tab_charts:
@@ -719,6 +733,10 @@ def main():
             pc1.metric("Absolute Poverty Rate (KL)", f"{kl_pov['poverty_absolute']:.1f}%")
             pc2.metric("Relative Poverty Rate (KL)", f"{kl_pov['poverty_relative']:.1f}%")
             st.caption("Poverty rates at district level (W.P. Kuala Lumpur) sourced from DOSM via data.gov.my.")
+
+    with tab_mortgage:
+        median_kl_price = df["txn_price_rm"].median() if len(df) > 0 else None
+        render_mortgage_calculator(median_kl_price=median_kl_price)
 
     st.markdown("---")
     st.caption("© 2026 KnowSay. All rights reserved. Powered by data, not hearsay.")
